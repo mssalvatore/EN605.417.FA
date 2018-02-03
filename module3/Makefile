@@ -5,8 +5,6 @@ DATA_FILE=t8.shakespeare.txt
 
 all: get_shakespeare
 	$(CC) -o $(OUTFILE) jumbler.cu $(OPTIONS)
-test: get_shakespeare
-	$(CC) -o test test.cu $(OPTIONS)
 get_shakespeare:
 	@if [ ! -f $(DATA_FILE) ];then \
 		wget https://ocw.mit.edu/ans7870/6/6.006/s08/lecturenotes/files/t8.shakespeare.txt; \
@@ -14,5 +12,4 @@ get_shakespeare:
 
 clean:
 	@-rm t8.shakespeare.*txt*
-	@-rm test
 	@rm jumbler
