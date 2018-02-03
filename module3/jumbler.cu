@@ -45,19 +45,19 @@ size_t calculatePadding(size_t fileSize)
     return paddingBytes;
 }
 
-uint8_t * readFile(const char * filename, size_t * outBytesRead)
+uint8_t * readFile(const char * filename, size_t * outBytesRead, size_t * paddingBytes)
 {
     FILE *handle = fopen(filename, "rb");
     fseek(handle, 0, SEEK_END);
     *outBytesRead = ftell(handle);
-    size_t paddingBytes = calculatePadding(*outBytesRead);
+    *paddingBytes = calculatePadding(*outBytesRead);
     rewind(handle);
 
-    uint8_t * buf = (uint8_t *) malloc((*outBytesRead + paddingBytes)*sizeof(uint8_t));
+    uint8_t * buf = (uint8_t *) malloc((*outBytesRead + *paddingBytes)*sizeof(uint8_t));
     fread(buf, *outBytesRead, 1, handle);
     fclose(handle);
 
-    *outBytesRead += paddingBytes;
+    *outBytesRead += *paddingBytes;
     return buf;
 }
 
@@ -102,7 +102,8 @@ void main_sub()
 {
 
     size_t bytesRead;
-    uint8_t *data = readFile("t8.shakespeare.txt", &bytesRead);
+    size_t paddingBytes;
+    uint8_t *data = readFile("t8.shakespeare.txt", &bytesRead, &paddingBytes);
     printf("Bytes read %d", bytesRead);
     printf("\n\n");
 
@@ -119,7 +120,7 @@ void main_sub()
 
     unjumble(jta, gpu_block, bytesRead);
 	cudaMemcpy(data, gpu_block, bytesRead, cudaMemcpyDeviceToHost );
-	writeFile("t8.shakespeare.unjumbled.txt", data, bytesRead);
+	writeFile("t8.shakespeare.unjumbled.txt", data, (bytesRead - paddingBytes));
 
 	/* Execute our kernel */
 
