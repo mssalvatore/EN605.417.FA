@@ -17,29 +17,26 @@ struct JumbleThreadAllocation {
     uint32_t Threads1Byte;
 };
 
-
+template <typename T>
 __global__ 
-void jumble(uint8_t * data, uint8_t dataBlockSize, size_t numBytes, uint8_t rotateNumBits)
+void jumble(T * data, uint8_t rotateNumBits)
 {
-    rotateNumBits = rotateNumBits % (dataBlockSize * 8);
-    
-	const unsigned int thread_idx = (blockIdx.x * blockDim.x) + threadIdx.x;
-	uint64_t dataToManipulate = (uint64_t) (data[thread_idx * dataBlockSize]);
-    uint64_t manipulatedData = (dataToManipulate >> rotateNumBits) | 
-						(dataToManipulate << ((dataBlockSize * 8) - rotateNumBits));
-	data[thread_idx * dataBlockSize] = manipulatedData;
+	size_t numBits = sizeof(T) * 8;
+    rotateNumBits = rotateNumBits % numBits;
+	const unsigned int dataIndex = ((blockIdx.x * blockDim.x) + threadIdx.x);
+
+	data[dataIndex] = (data[dataIndex] >> rotateNumBits) | (data[dataIndex] << (numBits - rotateNumBits));
 }
 
+template <typename T>
 __global__ 
-void unjumble(uint8_t * data, uint8_t dataBlockSize, size_t numBytes, uint8_t rotateNumBits)
+void unjumble(T * data, uint8_t rotateNumBits)
 {
-    rotateNumBits = rotateNumBits % (dataBlockSize * 8);
-    
-	const unsigned int thread_idx = (blockIdx.x * blockDim.x) + threadIdx.x;
-	uint64_t dataToManipulate = (uint64_t) (data[thread_idx * dataBlockSize]);
-    uint64_t manipulatedData = (dataToManipulate << rotateNumBits) | 
-						(dataToManipulate >> ((dataBlockSize * 8) - rotateNumBits));
-	data[thread_idx * dataBlockSize] = manipulatedData;
+	size_t numBits = sizeof(T) * 8;
+    rotateNumBits = rotateNumBits % numBits;
+	const unsigned int dataIndex = ((blockIdx.x * blockDim.x) + threadIdx.x);
+
+	data[dataIndex] = (data[dataIndex] << rotateNumBits) | (data[dataIndex] >> (numBits - rotateNumBits));
 }
 
 size_t calculatePadding(size_t fileSize)
@@ -63,6 +60,15 @@ uint8_t * readFile(const char * filename, size_t * outBytesRead)
     *outBytesRead += paddingBytes;
     return buf;
 }
+
+void writeFile(const char * filename, uint8_t * dataToWrite, size_t bytesToWrite)
+{
+    FILE *handle = fopen(filename, "w");
+
+    fwrite(dataToWrite, 1, bytesToWrite, handle);
+    fclose(handle);
+}
+
 JumbleThreadAllocation calculateThreadAllocation(size_t numBytes)
 {
     return 
@@ -79,17 +85,17 @@ JumbleThreadAllocation calculateThreadAllocation(size_t numBytes)
 }
 
 void jumble(JumbleThreadAllocation jta, uint8_t *gpu_block, size_t numBytes) {
-	jumble<<<ceil(((double)jta.Threads8Byte) / jta.BlockSize8Byte), jta.BlockSize8Byte>>>(gpu_block, 8, numBytes, (uint8_t)'A');
-	//jumble<<<ceil(((double)jta.Threads4Byte) / jta.BlockSize4Byte), jta.BlockSize4Byte>>>(gpu_block, 4, numBytes, (uint8_t)'B');
-	//jumble<<<ceil(((double)jta.Threads2Byte) / jta.BlockSize2Byte), jta.BlockSize2Byte>>>(gpu_block, 2, numBytes, (uint8_t)'C');
-	//jumble<<<ceil(((double)jta.Threads1Byte) / jta.BlockSize1Byte), jta.BlockSize1Byte>>>(gpu_block, 1, numBytes, (uint8_t)'D');
+	jumble<<<ceil(((double)jta.Threads8Byte) / jta.BlockSize8Byte), jta.BlockSize8Byte>>>((uint64_t *)gpu_block, (uint8_t)'A');
+	jumble<<<ceil(((double)jta.Threads4Byte) / jta.BlockSize4Byte), jta.BlockSize4Byte>>>((uint32_t *)gpu_block, (uint8_t)'B');
+	jumble<<<ceil(((double)jta.Threads2Byte) / jta.BlockSize2Byte), jta.BlockSize2Byte>>>((uint16_t *)gpu_block, (uint8_t)'C');
+	jumble<<<ceil(((double)jta.Threads1Byte) / jta.BlockSize1Byte), jta.BlockSize1Byte>>>((uint8_t *)gpu_block, (uint8_t)'D');
 }
 
 void unjumble(JumbleThreadAllocation jta, uint8_t *gpu_block, size_t numBytes) {
-	//unjumble<<<ceil(((double)jta.Threads1Byte) / jta.BlockSize1Byte), jta.BlockSize1Byte>>>(gpu_block, 1, numBytes, (uint8_t)'D');
-	//unjumble<<<ceil(((double)jta.Threads2Byte) / jta.BlockSize2Byte), jta.BlockSize2Byte>>>(gpu_block, 2, numBytes, (uint8_t)'C');
-	//unjumble<<<ceil(((double)jta.Threads4Byte) / jta.BlockSize4Byte), jta.BlockSize4Byte>>>(gpu_block, 4, numBytes, (uint8_t)'B');
-	unjumble<<<ceil(((double)jta.Threads8Byte) / jta.BlockSize8Byte), jta.BlockSize8Byte>>>(gpu_block, 8, numBytes, (uint8_t)'A');
+	unjumble<<<ceil(((double)jta.Threads1Byte) / jta.BlockSize1Byte), jta.BlockSize1Byte>>>((uint8_t *)gpu_block, (uint8_t)'D');
+	unjumble<<<ceil(((double)jta.Threads2Byte) / jta.BlockSize2Byte), jta.BlockSize2Byte>>>((uint16_t *)gpu_block, (uint8_t)'C');
+	unjumble<<<ceil(((double)jta.Threads4Byte) / jta.BlockSize4Byte), jta.BlockSize4Byte>>>((uint32_t *)gpu_block, (uint8_t)'B');
+	unjumble<<<ceil(((double)jta.Threads8Byte) / jta.BlockSize8Byte), jta.BlockSize8Byte>>>((uint64_t *)gpu_block, (uint8_t)'A');
 }
 
 void main_sub()
@@ -106,13 +112,14 @@ void main_sub()
 
 	cudaMalloc((void **)&gpu_block, bytesRead);
 	cudaMemcpy(gpu_block, data, bytesRead, cudaMemcpyHostToDevice);
-	printf("%c\n", data[0]);
+
     jumble(jta, gpu_block, bytesRead);
 	cudaMemcpy(data, gpu_block, bytesRead, cudaMemcpyDeviceToHost );
-	printf("%c\n", data[0]);
+	writeFile("t8.shakespeare.jumbled.txt", data, bytesRead);
+
     unjumble(jta, gpu_block, bytesRead);
-	cudaMemcpy( data, gpu_block, bytesRead, cudaMemcpyDeviceToHost );
-	printf("%c\n", data[0]);
+	cudaMemcpy(data, gpu_block, bytesRead, cudaMemcpyDeviceToHost );
+	writeFile("t8.shakespeare.unjumbled.txt", data, bytesRead);
 
 	/* Execute our kernel */
 

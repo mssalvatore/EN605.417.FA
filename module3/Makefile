@@ -13,6 +13,6 @@ get_shakespeare:
 	fi
 
 clean:
-	@-rm t8.shakespeare.txt*
+	@-rm t8.shakespeare.*txt*
 	@-rm test
 	@rm jumbler
