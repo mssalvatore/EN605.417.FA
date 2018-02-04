@@ -64,9 +64,9 @@ uint8_t * readFile(const char * filename, size_t * outBytesRead, size_t * paddin
 }
 
 // Write a file out to disk
-void writeFile(const char * filename, uint8_t * dataToWrite, size_t bytesToWrite)
+void writeFile(std::string filename, uint8_t * dataToWrite, size_t bytesToWrite)
 {
-	FILE *handle = fopen(filename, "w");
+	FILE *handle = fopen(filename.c_str(), "w");
 
 	fwrite(dataToWrite, 1, bytesToWrite, handle);
 	fclose(handle);
@@ -104,17 +104,30 @@ void unjumble(JumbleThreadAllocation jta, uint8_t *gpu_block, size_t numBytes) {
 	unjumble<<<ceil(((double)jta.Threads8Byte) / jta.BlockSize8Byte), jta.BlockSize8Byte>>>((uint64_t *)gpu_block, (uint8_t)'A');
 }
 
-void main_sub()
+void printJumbleThreadAllocation(JumbleThreadAllocation jta)
 {
+	printf("Rotate 8 bytes chunks using %g blocks of size %d and %d total threads.\n", ceil((double)jta.Threads8Byte / jta.BlockSize8Byte), jta.BlockSize8Byte, jta.Threads8Byte);
+	printf("Rotate 4 bytes chunks using %g blocks of size %d and %d total threads.\n", ceil((double)jta.Threads4Byte / jta.BlockSize4Byte), jta.BlockSize4Byte, jta.Threads4Byte);
+	printf("Rotate 2 bytes chunks using %g blocks of size %d and %d total threads.\n", ceil((double)jta.Threads2Byte / jta.BlockSize2Byte), jta.BlockSize2Byte, jta.Threads2Byte);
+	printf("Rotate 1 bytes chunks using %g blocks of size %d and %d total threads.\n", ceil((double)jta.Threads1Byte / jta.BlockSize1Byte), jta.BlockSize1Byte, jta.Threads1Byte);
+}
+
+int main(int argc, char* argv[])
+{
+	std::string fileName = "t8.shakespeare.txt";
+	if (argc > 1) {
+		fileName = argv[1];
+	}
 	size_t bytesRead;
 	size_t paddingBytes;
 	size_t dataSize;
-	uint8_t *data = readFile("t8.shakespeare.txt", &bytesRead, &paddingBytes);
+	uint8_t *data = readFile(fileName.c_str(), &bytesRead, &paddingBytes);
 	dataSize = bytesRead + paddingBytes;
 	printf("Bytes read %d\n", bytesRead);
 	printf("Padding bytes %d\n", paddingBytes);
 
 	JumbleThreadAllocation jta = calculateThreadAllocation(dataSize);
+	printJumbleThreadAllocation(jta);
 
 	// Allocate memory on GPU
 	uint8_t *gpu_block;
@@ -124,21 +137,15 @@ void main_sub()
 	// Jumble up the data and dump it to disk
 	jumble(jta, gpu_block, dataSize);
 	cudaMemcpy(data, gpu_block, dataSize, cudaMemcpyDeviceToHost);
-	writeFile("t8.shakespeare.jumbled.txt", data, dataSize);
+	writeFile(fileName + ".jumbled", data, dataSize);
 
 	// Unjumble the data and dump it to disk
 	unjumble(jta, gpu_block, dataSize);
 	cudaMemcpy(data, gpu_block, dataSize, cudaMemcpyDeviceToHost);
-	writeFile("t8.shakespeare.unjumbled.txt", data, bytesRead);
+	writeFile(fileName + ".unjumbled", data, bytesRead);
 
 	/* Free the arrays on the GPU as now we're done with them */
 	cudaFree(gpu_block);
-}
-
-
-int main()
-{
-	main_sub();
 
 	return EXIT_SUCCESS;
 }
