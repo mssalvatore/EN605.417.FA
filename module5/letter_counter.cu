@@ -223,17 +223,21 @@ int main(int argc, char* argv[])
 	printf("Bytes read: %d\n", bytesRead);
 	printf("Padding bytes: %d\n", paddingBytes);
 
+    uint8_t *pinnedData;
+    cudaMallocHost((void**)&pinnedData, dataSize);
+    memcpy(pinnedData, data, dataSize);
+
     // Run letter counter on the CPU
     memset(letterCounts, 0, NUM_CHARS * sizeof(uint32_t));
-    uint64_t cpuDuration = countWithCPU(data, dataSize, letterCounts, ascii_a);
+    uint64_t cpuDuration = countWithCPU(pinnedData, dataSize, letterCounts, ascii_a);
 
     // Run letter counter on the GPU with global memory
     memset(letterCounts, 0, NUM_CHARS * sizeof(uint32_t));
-    uint64_t gpuGlobalDuration = countWithGPUGlobal(data, dataSize, letterCounts, textChunkSize);
+    uint64_t gpuGlobalDuration = countWithGPUGlobal(pinnedData, dataSize, letterCounts, textChunkSize);
 
     // Run letter counter on the GPU with shared memory
     memset(letterCounts, 0, NUM_CHARS * sizeof(uint32_t));
-    uint64_t gpuSharedDuration = countWithGPUShared(data, dataSize, letterCounts, textChunkSize);
+    uint64_t gpuSharedDuration = countWithGPUShared(pinnedData, dataSize, letterCounts, textChunkSize);
     unpadResult(letterCounts, paddingBytes);
 
     // Display letter counts and timing
