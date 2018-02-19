@@ -145,8 +145,8 @@ uint64_t countWithGPUShared(uint8_t * data, size_t dataSize, uint32_t * letterCo
     cudaMemcpy(gpuLetterCounts, letterCounts, NUM_CHARS * sizeof(uint32_t), cudaMemcpyHostToDevice);
 
     // Run Kernel
-    auto start = std::chrono::high_resolution_clock::now();
     shiftLetters<<<textChunkSize, NUM_THREADS>>>(gpuData);
+    auto start = std::chrono::high_resolution_clock::now();
     countLettersShared<<<1, NUM_THREADS>>>(gpuData, gpuLetterCounts, textChunkSize);
     auto stop = std::chrono::high_resolution_clock::now();
 
@@ -159,7 +159,7 @@ uint64_t countWithGPUShared(uint8_t * data, size_t dataSize, uint32_t * letterCo
     return std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count();
 }
 
-// Count the occurence of each letter in *data using shared memory
+// Count the occurence of each letter in *data using register memory
 uint64_t countWithGPURegisters(uint8_t * data, size_t dataSize, uint32_t * letterCounts, size_t textChunkSize)
 {
     // Declare cuda memory
@@ -172,8 +172,8 @@ uint64_t countWithGPURegisters(uint8_t * data, size_t dataSize, uint32_t * lette
     cudaMemcpy(gpuLetterCounts, letterCounts, NUM_CHARS * sizeof(uint32_t), cudaMemcpyHostToDevice);
 
     // Run Kernel
-    auto start = std::chrono::high_resolution_clock::now();
     shiftLetters<<<textChunkSize, NUM_THREADS>>>(gpuData);
+    auto start = std::chrono::high_resolution_clock::now();
     countLettersRegisters<<<1, NUM_THREADS>>>(gpuData, gpuLetterCounts, textChunkSize);
     auto stop = std::chrono::high_resolution_clock::now();
 
@@ -202,8 +202,8 @@ uint64_t countWithGPUGlobal(uint8_t * data, size_t dataSize, uint32_t * letterCo
     cudaMalloc((void **)&threadLetterCounts, SHARED_MEM_SIZE);
 
     // Run Kernel
-    auto start = std::chrono::high_resolution_clock::now();
     shiftLetters<<<textChunkSize, NUM_THREADS>>>(gpuData);
+    auto start = std::chrono::high_resolution_clock::now();
     countLettersGlobal<<<1, NUM_THREADS>>>(gpuData, gpuLetterCounts, threadLetterCounts, textChunkSize);
     auto stop = std::chrono::high_resolution_clock::now();
 
@@ -212,19 +212,6 @@ uint64_t countWithGPUGlobal(uint8_t * data, size_t dataSize, uint32_t * letterCo
     /* Free the arrays on the GPU as now we're done with them */
     cudaFree(gpuData);
     cudaFree(gpuLetterCounts);
-
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count();
-}
-
-// Use the CPU to count the occurrences of each letter in *data
-uint64_t countWithCPU(uint8_t * data, size_t dataSize, uint32_t * letterCounts, int ascii_a)
-{
-    auto start = std::chrono::high_resolution_clock::now();
-    for (size_t i = 0; i < dataSize; i++)
-    {
-        letterCounts[data[i] - ascii_a]++;
-    }
-    auto stop = std::chrono::high_resolution_clock::now();
 
     return std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count();
 }
@@ -241,20 +228,17 @@ void displayResults(uint32_t * letterCounts)
     printf("\n\n");
 }
 
-// Display and analyze the run times (shared vs. global vs. CPU)
-void displayTimingResults(uint64_t gpuSharedDuration, uint64_t gpuGlobalDuration, uint64_t gpuRegisterDuration, uint64_t cpuDuration)
+// Display and analyze the run times (shared vs. global vs. register)
+void displayTimingResults(uint64_t gpuSharedDuration, uint64_t gpuGlobalDuration, uint64_t gpuRegisterDuration)
 {
     printf("Took %dns to run processing on GPU with shared memory\n", gpuSharedDuration);
     printf("Took %dns to run processing on GPU with global memory\n", gpuGlobalDuration);
     printf("Took %dns to run processing on GPU with register memory\n", gpuRegisterDuration);
-    printf("Took %dns to run on CPU\n", cpuDuration);
 
     printf("\n");
     printf("Shared Memory runs %fx faster than global memory\n", ((double)gpuGlobalDuration) / gpuSharedDuration);
     printf("Register Memory runs %fx faster than shared memory\n", ((double)gpuSharedDuration) / gpuRegisterDuration);
     printf("Register Memory runs %fx faster than global memory\n", ((double)gpuGlobalDuration) / gpuRegisterDuration);
-    printf("Shared Memory on GPU runs %fx faster than the CPU\n", ((double)cpuDuration) / gpuSharedDuration);
-    printf("Register Memory on GPU runs %fx faster than the CPU\n", ((double)cpuDuration) / gpuRegisterDuration);
     printf("\n");
 }
 
@@ -288,10 +272,6 @@ int main(int argc, char* argv[])
     cudaMallocHost((void**)&pinnedData, dataSize);
     memcpy(pinnedData, data, dataSize);
 
-    // Run letter counter on the CPU
-    memset(letterCounts, 0, NUM_CHARS * sizeof(uint32_t));
-    uint64_t cpuDuration = countWithCPU(pinnedData, dataSize, letterCounts, ascii_a);
-
     // Run letter counter on the GPU with global memory
     memset(letterCounts, 0, NUM_CHARS * sizeof(uint32_t));
     uint64_t gpuGlobalDuration = countWithGPUGlobal(pinnedData, dataSize, letterCounts, textChunkSize);
@@ -308,22 +288,24 @@ int main(int argc, char* argv[])
 
     // Display letter counts and timing
     displayResults(letterCounts);
-    displayTimingResults(gpuSharedDuration, gpuGlobalDuration, gpuRegisterDuration, cpuDuration);
+    displayTimingResults(gpuSharedDuration, gpuGlobalDuration, gpuRegisterDuration);
 
-    gpuSharedDuration = 0;
-    gpuRegisterDuration = 0;
-    for (uint16_t i = 0; i < 100; i++)
+    uint16_t numRuns = 10;
+    double ratioSum = 0;
+    for (uint16_t i = 0; i < numRuns; i++)
     {
         // Run letter counter on the GPU with shared memory
         memset(letterCounts, 0, NUM_CHARS * sizeof(uint32_t));
-        gpuSharedDuration += countWithGPUShared(pinnedData, dataSize, letterCounts, textChunkSize);
+        gpuSharedDuration = countWithGPUShared(pinnedData, dataSize, letterCounts, textChunkSize);
 
         // Run letter counter on the GPU with registers
         memset(letterCounts, 0, NUM_CHARS * sizeof(uint32_t));
-        gpuRegisterDuration += countWithGPURegisters(pinnedData, dataSize, letterCounts, textChunkSize);
+        gpuRegisterDuration = countWithGPURegisters(pinnedData, dataSize, letterCounts, textChunkSize);
+
+        ratioSum += ((double)gpuRegisterDuration) / gpuSharedDuration;
     }
 
-    printf("On average over 100 runs, using registers performed %fx faster than shared memory\n", ((float) gpuSharedDuration) / gpuRegisterDuration);
+    printf("On average over %d runs, using registers performed %fx faster than shared memory\n", numRuns, ratioSum / numRuns);
 
 
 
