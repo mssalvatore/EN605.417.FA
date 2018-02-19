@@ -5,10 +5,8 @@
 
 __host__ void wait_exit(void)
 {
-        char ch;
-
         printf("\nPress any key to exit");
-        ch = getchar();
+        char ch = getchar();
 }
 
 __host__ void generate_rand_data(unsigned int * host_data_ptr)
