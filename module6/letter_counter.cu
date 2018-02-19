@@ -310,5 +310,22 @@ int main(int argc, char* argv[])
     displayResults(letterCounts);
     displayTimingResults(gpuSharedDuration, gpuGlobalDuration, gpuRegisterDuration, cpuDuration);
 
+    gpuSharedDuration = 0;
+    gpuRegisterDuration = 0;
+    for (uint16_t i = 0; i < 100; i++)
+    {
+        // Run letter counter on the GPU with shared memory
+        memset(letterCounts, 0, NUM_CHARS * sizeof(uint32_t));
+        gpuSharedDuration += countWithGPUShared(pinnedData, dataSize, letterCounts, textChunkSize);
+
+        // Run letter counter on the GPU with registers
+        memset(letterCounts, 0, NUM_CHARS * sizeof(uint32_t));
+        gpuRegisterDuration += countWithGPURegisters(pinnedData, dataSize, letterCounts, textChunkSize);
+    }
+
+    printf("On average over 100 runs, using registers performed %fx faster than shared memory\n", ((float) gpuSharedDuration) / gpuRegisterDuration);
+
+
+
     return EXIT_SUCCESS;
 }
