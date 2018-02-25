@@ -135,7 +135,7 @@ void getMaxMinAvg(uint32_t dataSize, uint32_t numBlocks, uint32_t * data, uint32
     bool sumFinished = false;
 
     // Check the event for each operation and measure total time to completion
-    while (!maxFinished && !minFinished && !sumFinished)
+    while (!maxFinished || !minFinished || !sumFinished)
     {
         if (!maxFinished && (cudaEventQuery(gotMax) == cudaSuccess))
         {
