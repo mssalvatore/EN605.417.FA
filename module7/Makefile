@@ -9,4 +9,5 @@ stretch:
 	$(CC) -o stretch module7_stretch_problem.cu $(OPTIONS)
 
 clean:
-	@rm streams
+	@-rm streams
+	@-rm stretch
