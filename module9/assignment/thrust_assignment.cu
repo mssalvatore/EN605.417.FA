@@ -137,10 +137,9 @@ uint32_t * generateDataSet(uint32_t dataSize)
     uint32_t * data;
     cudaMallocHost((void**)&data, dataSize * sizeof(uint32_t));
 
-    //uint32_t range = dataSize * 4;
+    uint32_t range = dataSize * 4;
     for(size_t i = 0; i < dataSize; i++){ 
-        //data[i] = rand() % range + 1;
-        data[i] = i;
+        data[i] = rand() % range + 1;
     }
 
     return data;
