@@ -24,10 +24,10 @@
 #include <CL/cl.h>
 #endif
 
-///
-//  Constants
-//
-const int ARRAY_SIZE = 1000;
+// Constants
+#define MIN_SIZE 10
+#define MAX_SIZE 100000
+#define FACTOR 10
 
 ///
 //  Create an OpenCL context on the first available platform using
@@ -179,14 +179,14 @@ cl_program CreateProgram(cl_context context, cl_device_id device, const char* fi
 //  and b (input)
 //
 bool CreateMemObjects(cl_context context, cl_mem memObjects[3],
-                      float *a, float *b)
+                      float *a, float *b, size_t arraySize)
 {
     memObjects[0] = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                   sizeof(float) * ARRAY_SIZE, a, NULL);
+                                   sizeof(float) * arraySize, a, NULL);
     memObjects[1] = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                   sizeof(float) * ARRAY_SIZE, b, NULL);
+                                   sizeof(float) * arraySize, b, NULL);
     memObjects[2] = clCreateBuffer(context, CL_MEM_READ_WRITE,
-                                   sizeof(float) * ARRAY_SIZE, NULL, NULL);
+                                   sizeof(float) * arraySize, NULL, NULL);
 
     if (memObjects[0] == NULL || memObjects[1] == NULL || memObjects[2] == NULL)
     {
@@ -252,7 +252,7 @@ int setup(cl_context *context, cl_command_queue *commandQueue, cl_program *progr
     return 0;
 }
 
-int createAndRunKernel(cl_context *context, cl_command_queue *commandQueue, cl_program *program, cl_device_id *device, cl_mem memObjects[3], const char* kernelName)
+int createAndRunKernel(cl_context *context, cl_command_queue *commandQueue, cl_program *program, cl_device_id *device, cl_mem memObjects[3], const char* kernelName, size_t arraySize, bool outputResults)
 {
     cl_kernel kernel = 0;
     cl_int errNum;
@@ -269,16 +269,16 @@ int createAndRunKernel(cl_context *context, cl_command_queue *commandQueue, cl_p
     // Create memory objects that will be used as arguments to
     // kernel.  First create host memory arrays that will be
     // used to store the arguments to the kernel
-    float result[ARRAY_SIZE];
-    float a[ARRAY_SIZE];
-    float b[ARRAY_SIZE];
-    for (int i = 0; i < ARRAY_SIZE; i++)
+    float result[arraySize];
+    float a[arraySize];
+    float b[arraySize];
+    for (int i = 0; i < arraySize; i++)
     {
         a[i] = (float)i;
         b[i] = (float)(i * 2);
     }
 
-    if (!CreateMemObjects(*context, memObjects, a, b))
+    if (!CreateMemObjects(*context, memObjects, a, b, arraySize))
     {
         Cleanup(context, commandQueue, program, kernel, memObjects);
         return 1;
@@ -295,7 +295,7 @@ int createAndRunKernel(cl_context *context, cl_command_queue *commandQueue, cl_p
         return 1;
     }
 
-    size_t globalWorkSize[1] = { ARRAY_SIZE };
+    size_t globalWorkSize[1] = { arraySize };
     size_t localWorkSize[1] = { 1 };
 
     // Queue the kernel up for execution across the array
@@ -309,13 +309,9 @@ int createAndRunKernel(cl_context *context, cl_command_queue *commandQueue, cl_p
         Cleanup(context, commandQueue, program, kernel, memObjects);
         return 1;
     }
-    auto stop = std::chrono::high_resolution_clock::now();
-
-    int32_t runTime = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count();
-    std::cout << "Run time for kernel was " << runTime << " nanoseconds" <<std::endl;
     // Read the output buffer back to the Host
     errNum = clEnqueueReadBuffer(*commandQueue, memObjects[2], CL_TRUE,
-                                 0, ARRAY_SIZE * sizeof(float), result,
+                                 0, arraySize * sizeof(float), result,
                                  0, NULL, NULL);
     if (errNum != CL_SUCCESS)
     {
@@ -323,14 +319,19 @@ int createAndRunKernel(cl_context *context, cl_command_queue *commandQueue, cl_p
         Cleanup(context, commandQueue, program, kernel, memObjects);
         return 1;
     }
+    auto stop = std::chrono::high_resolution_clock::now();
+
+    int32_t runTime = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count();
+    std::cout << "Run time for kernel was " << runTime << " nanoseconds" <<std::endl;
 
     // Output the result buffer
-    for (int i = 0; i < ARRAY_SIZE; i++)
-    {
-        std::cout << result[i] << " ";
+    if (outputResults) {
+        for (int i = 0; i < arraySize; i++)
+        {
+            std::cout << result[i] << " ";
+        }
+        std::cout << std::endl;
     }
-    std::cout << std::endl;
-    std::cout << "Executed program succesfully." << std::endl;
 
     clReleaseKernel(kernel);
     return 0;
@@ -347,22 +348,27 @@ int main(int argc, char** argv)
     cl_device_id device = 0;
     cl_mem memObjects[3] = { 0, 0, 0 };
 
-    setup(&context, &commandQueue, &program, &device, memObjects);
-    std::cout << "Run add kernel\n\n";
-    createAndRunKernel(&context, &commandQueue, &program, &device, memObjects, "add_kernel");
-    std::cout << "\n\n";
-    std::cout << "Run sub kernel\n\n";
-    createAndRunKernel(&context, &commandQueue, &program, &device, memObjects, "sub_kernel");
-    std::cout << "\n\n";
-    std::cout << "Run mul kernel\n\n";
-    createAndRunKernel(&context, &commandQueue, &program, &device, memObjects, "mul_kernel");
-    std::cout << "\n\n";
-    std::cout << "Run div kernel\n\n";
-    createAndRunKernel(&context, &commandQueue, &program, &device, memObjects, "div_kernel");
-    std::cout << "\n\n";
-    std::cout << "Run pow kernel\n\n";
-    createAndRunKernel(&context, &commandQueue, &program, &device, memObjects, "pow_kernel");
-    std::cout << "\n\n";
+    for (size_t arraySize = MIN_SIZE; arraySize <= MAX_SIZE; arraySize *= FACTOR)
+    {
+        std::cout << "Running kernels with array size " << arraySize << std::endl;
+
+        setup(&context, &commandQueue, &program, &device, memObjects);
+        std::cout << "Run add kernel\n";
+        createAndRunKernel(&context, &commandQueue, &program, &device, memObjects, "add_kernel", arraySize, arraySize == 10);
+        std::cout << "\n";
+        std::cout << "Run sub kernel\n";
+        createAndRunKernel(&context, &commandQueue, &program, &device, memObjects, "sub_kernel", arraySize, arraySize == 10);
+        std::cout << "\n";
+        std::cout << "Run mul kernel\n";
+        createAndRunKernel(&context, &commandQueue, &program, &device, memObjects, "mul_kernel", arraySize, arraySize == 10);
+        std::cout << "\n";
+        std::cout << "Run div kernel\n";
+        createAndRunKernel(&context, &commandQueue, &program, &device, memObjects, "div_kernel", arraySize, arraySize == 10);
+        std::cout << "\n";
+        std::cout << "Run pow kernel\n";
+        createAndRunKernel(&context, &commandQueue, &program, &device, memObjects, "pow_kernel", arraySize, arraySize == 10);
+        std::cout << "\n";
+    }
 
     Cleanup(&context, &commandQueue, &program, 0, memObjects);
 }
