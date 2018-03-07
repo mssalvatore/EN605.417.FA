@@ -16,6 +16,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <chrono>
 
 #ifdef __APPLE__
 #include <OpenCL/cl.h>
@@ -199,41 +200,33 @@ bool CreateMemObjects(cl_context context, cl_mem memObjects[3],
 ///
 //  Cleanup any created OpenCL resources
 //
-void Cleanup(cl_context context, cl_command_queue commandQueue,
-             cl_program program, cl_kernel kernel, cl_mem memObjects[3])
+void Cleanup(cl_context *context, cl_command_queue *commandQueue,
+             cl_program *program, cl_kernel kernel, cl_mem memObjects[3])
 {
     for (int i = 0; i < 3; i++)
     {
         if (memObjects[i] != 0)
             clReleaseMemObject(memObjects[i]);
     }
-    if (commandQueue != 0)
-        clReleaseCommandQueue(commandQueue);
+    if (*commandQueue != 0)
+        clReleaseCommandQueue(*commandQueue);
 
     if (kernel != 0)
         clReleaseKernel(kernel);
 
-    if (program != 0)
-        clReleaseProgram(program);
+    if (*program != 0)
+        clReleaseProgram(*program);
 
-    if (context != 0)
-        clReleaseContext(context);
+    if (*context != 0)
+        clReleaseContext(*context);
 
 }
 
-int createAndRunKernel(const char* kernelName)
+int setup(cl_context *context, cl_command_queue *commandQueue, cl_program *program, cl_device_id *device, cl_mem memObjects[3])
 {
-    cl_context context = 0;
-    cl_command_queue commandQueue = 0;
-    cl_program program = 0;
-    cl_device_id device = 0;
-    cl_kernel kernel = 0;
-    cl_mem memObjects[3] = { 0, 0, 0 };
-    cl_int errNum;
-
     // Create an OpenCL context on first available platform
-    context = CreateContext();
-    if (context == NULL)
+    *context = CreateContext();
+    if (*context == NULL)
     {
         std::cerr << "Failed to create OpenCL context." << std::endl;
         return 1;
@@ -241,23 +234,31 @@ int createAndRunKernel(const char* kernelName)
 
     // Create a command-queue on the first device available
     // on the created context
-    commandQueue = CreateCommandQueue(context, &device);
-    if (commandQueue == NULL)
+    *commandQueue = CreateCommandQueue(*context, device);
+    if (*commandQueue == NULL)
     {
-        Cleanup(context, commandQueue, program, kernel, memObjects);
+        Cleanup(context, commandQueue, program, 0, memObjects);
         return 1;
     }
 
-    // Create OpenCL program from HelloWorld.cl kernel source
-    program = CreateProgram(context, device, "MathFuncs.cl");
+    // Create OpenCL program from HelloWorld.cl 0 source
+    *program = CreateProgram(*context, *device, "MathFuncs.cl");
     if (program == NULL)
     {
-        Cleanup(context, commandQueue, program, kernel, memObjects);
+        Cleanup(context, commandQueue, program, 0, memObjects);
         return 1;
     }
 
+    return 0;
+}
+
+int createAndRunKernel(cl_context *context, cl_command_queue *commandQueue, cl_program *program, cl_device_id *device, cl_mem memObjects[3], const char* kernelName)
+{
+    cl_kernel kernel = 0;
+    cl_int errNum;
+
     // Create OpenCL kernel
-    kernel = clCreateKernel(program, kernelName, NULL);
+    kernel = clCreateKernel(*program, kernelName, NULL);
     if (kernel == NULL)
     {
         std::cerr << "Failed to create kernel" << std::endl;
@@ -277,7 +278,7 @@ int createAndRunKernel(const char* kernelName)
         b[i] = (float)(i * 2);
     }
 
-    if (!CreateMemObjects(context, memObjects, a, b))
+    if (!CreateMemObjects(*context, memObjects, a, b))
     {
         Cleanup(context, commandQueue, program, kernel, memObjects);
         return 1;
@@ -298,7 +299,8 @@ int createAndRunKernel(const char* kernelName)
     size_t localWorkSize[1] = { 1 };
 
     // Queue the kernel up for execution across the array
-    errNum = clEnqueueNDRangeKernel(commandQueue, kernel, 1, NULL,
+    auto start = std::chrono::high_resolution_clock::now();
+    errNum = clEnqueueNDRangeKernel(*commandQueue, kernel, 1, NULL,
                                     globalWorkSize, localWorkSize,
                                     0, NULL, NULL);
     if (errNum != CL_SUCCESS)
@@ -307,9 +309,12 @@ int createAndRunKernel(const char* kernelName)
         Cleanup(context, commandQueue, program, kernel, memObjects);
         return 1;
     }
+    auto stop = std::chrono::high_resolution_clock::now();
 
+    int32_t runTime = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count();
+    std::cout << "Run time for kernel was " << runTime << " nanoseconds" <<std::endl;
     // Read the output buffer back to the Host
-    errNum = clEnqueueReadBuffer(commandQueue, memObjects[2], CL_TRUE,
+    errNum = clEnqueueReadBuffer(*commandQueue, memObjects[2], CL_TRUE,
                                  0, ARRAY_SIZE * sizeof(float), result,
                                  0, NULL, NULL);
     if (errNum != CL_SUCCESS)
@@ -326,8 +331,8 @@ int createAndRunKernel(const char* kernelName)
     }
     std::cout << std::endl;
     std::cout << "Executed program succesfully." << std::endl;
-    Cleanup(context, commandQueue, program, kernel, memObjects);
 
+    clReleaseKernel(kernel);
     return 0;
 }
 
@@ -336,5 +341,28 @@ int createAndRunKernel(const char* kernelName)
 //
 int main(int argc, char** argv)
 {
-    createAndRunKernel("div_kernel");
+    cl_context context = 0;
+    cl_command_queue commandQueue = 0;
+    cl_program program = 0;
+    cl_device_id device = 0;
+    cl_mem memObjects[3] = { 0, 0, 0 };
+
+    setup(&context, &commandQueue, &program, &device, memObjects);
+    std::cout << "Run add kernel\n\n";
+    createAndRunKernel(&context, &commandQueue, &program, &device, memObjects, "add_kernel");
+    std::cout << "\n\n";
+    std::cout << "Run sub kernel\n\n";
+    createAndRunKernel(&context, &commandQueue, &program, &device, memObjects, "sub_kernel");
+    std::cout << "\n\n";
+    std::cout << "Run mul kernel\n\n";
+    createAndRunKernel(&context, &commandQueue, &program, &device, memObjects, "mul_kernel");
+    std::cout << "\n\n";
+    std::cout << "Run div kernel\n\n";
+    createAndRunKernel(&context, &commandQueue, &program, &device, memObjects, "div_kernel");
+    std::cout << "\n\n";
+    std::cout << "Run pow kernel\n\n";
+    createAndRunKernel(&context, &commandQueue, &program, &device, memObjects, "pow_kernel");
+    std::cout << "\n\n";
+
+    Cleanup(&context, &commandQueue, &program, 0, memObjects);
 }
