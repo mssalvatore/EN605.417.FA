@@ -39,12 +39,6 @@ __device__ void reduce(uint32_t *dataSet, uint32_t* sharedData, uint32_t *result
     }
 }
 
-// Add two operands and return the result
-__device__ uint32_t add(uint32_t operand1, uint32_t operand2)
-{
-    return operand1 + operand2;
-}
-
 // Return the max of 2 elements without blocking (using a conditional)
 __device__ uint32_t maximum(uint32_t element1, uint32_t element2)
 {
@@ -55,35 +49,11 @@ __device__ uint32_t maximum(uint32_t element1, uint32_t element2)
     return findMax[element1 < element2];
 }
 
-// Return the min of 2 elements without blocking (using a conditional)
-__device__ uint32_t minimum(uint32_t element1, uint32_t element2)
-{
-    uint32_t findMax[2];
-    findMax[0] = element1;
-    findMax[1] = element2;
-
-    return findMax[element1 > element2];
-}
-
-// Get the sum of all elements in dataSet
-__global__ void sum(uint32_t* dataSet, uint32_t *result)
-{
-    extern __shared__ uint32_t sharedData[];
-    reduce(dataSet, sharedData, result, &add);
-}
-
 // Get the max of all elements in dataSet
 __global__ void getMax(uint32_t* dataSet, uint32_t *result)
 {
     extern __shared__ uint32_t sharedData[];
     reduce(dataSet, sharedData, result, &maximum);
-}
-
-// Get the min of all elements in dataSet
-__global__ void getMin(uint32_t* dataSet, uint32_t *result)
-{
-    extern __shared__ uint32_t sharedData[];
-    reduce(dataSet, sharedData, result, &minimum);
 }
 
 uint32_t mod7GetMax(uint32_t dataSize, uint32_t numBlocks, uint32_t * data)
