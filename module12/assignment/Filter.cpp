@@ -56,6 +56,7 @@ int main(int argc, char** argv)
 {
     const int BUFFER_SIZE = 16;
     const int FILTER_SIZE = 4;
+    const int NUM_KERNELS = BUFFER_SIZE / FILTER_SIZE;
     cl_uint input[BUFFER_SIZE];
     cl_float output[BUFFER_SIZE];
 
@@ -67,11 +68,12 @@ int main(int argc, char** argv)
     cl_platform_id * platformIDs;
 	cl_device_id * deviceIDs;
     cl_context context = NULL;
-	cl_command_queue queue;
 	cl_program program;
-	cl_kernel kernel;
 	cl_mem inputBuffer;
 	cl_mem outputBuffer;
+    cl_mem filters[NUM_KERNELS];
+    cl_kernel kernels[NUM_KERNELS];
+    cl_command_queue queues[NUM_KERNELS];
 
     // First, select an OpenCL platform to run on.  
 	errNum = clGetPlatformIDs(0, NULL, &numPlatforms);
@@ -177,13 +179,6 @@ int main(int argc, char** argv)
 		checkErr(errNum, "clBuildProgram");
     }
 
-	// Create kernel object
-	kernel = clCreateKernel(
-		program,
-		"filter",
-		&errNum);
-	checkErr(errNum, "clCreateKernel");
-
 	// Now allocate buffers
 	inputBuffer = clCreateBuffer(
 		context,
@@ -193,8 +188,16 @@ int main(int argc, char** argv)
 		&errNum);
 	checkErr(errNum, "clCreateBuffer(input)");
 
-    int x = 0;
-    //for (int x = 0; x < (BUFFER_SIZE / FILTER_SIZE); x++) {
+	outputBuffer = clCreateBuffer(
+		context,
+		CL_MEM_WRITE_ONLY,
+		sizeof(cl_uint) * BUFFER_SIZE,
+		NULL,
+		&errNum);
+	checkErr(errNum, "clCreateBuffer(outputSignal)");
+
+    //int x = 0;
+    for (int x = 0; x < NUM_KERNELS; x++) {
         cl_buffer_region region = 
             {
                 FILTER_SIZE * x * sizeof(int), 
@@ -207,53 +210,68 @@ int main(int argc, char** argv)
             &region,
             &errNum);
         checkErr(errNum, "clCreateSubBuffer");
-    //}
+        filters[x] = filterBuffer;
+    }
 
-
-
-	outputBuffer = clCreateBuffer(
-		context,
-		CL_MEM_WRITE_ONLY,
-		sizeof(cl_uint) * BUFFER_SIZE,
-		NULL,
-		&errNum);
-	checkErr(errNum, "clCreateBuffer(outputSignal)");
-
+    for (int x = 0; x< NUM_KERNELS; x++) {
 	// Pick the first device and create command queue.
-	queue = clCreateCommandQueue(
-		context,
-		deviceIDs[0],
-		0,
-		&errNum);
-	checkErr(errNum, "clCreateCommandQueue");
+        cl_command_queue queue = clCreateCommandQueue(
+                context,
+                deviceIDs[0],
+                0,
+                &errNum);
+        checkErr(errNum, "clCreateCommandQueue");
 
-    errNum  = clSetKernelArg(kernel, 0, sizeof(cl_mem), &inputBuffer);
-	errNum |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &filterBuffer);
-    errNum |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &outputBuffer);
-	errNum |= clSetKernelArg(kernel, 3, sizeof(cl_uint), &FILTER_SIZE);
-	checkErr(errNum, "clSetKernelArg");
+        queues[x] = queue;
 
-	//const size_t globalWorkSize[1] = { outputSignalDimension * outputSignalDimension };
-    //const size_t localWorkSize[1]  = { 1 };
-	const size_t globalWorkSize[2] = { 2,2};
-    const size_t localWorkSize[2]  = { 1,1};
+        // Create kernel object
+        cl_kernel kernel = clCreateKernel(
+                program,
+                "filter",
+                &errNum);
+        checkErr(errNum, "clCreateKernel");
+
+        errNum |= clSetKernelArg(kernel, 0, sizeof(cl_mem), &filters[x]);
+        errNum |= clSetKernelArg(kernel, 1, sizeof(cl_uint), &FILTER_SIZE);
+        errNum |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &outputBuffer);
+        errNum |= clSetKernelArg(kernel, 3, sizeof(cl_uint), &x);
+        checkErr(errNum, "clSetKernelArg");
+
+        kernels[x] = kernel;
+    }
+
+
+
+
+
+
+	//errNum |= clSetKernelArg(kernel, 0, sizeof(cl_mem), &filters[1]);
+	//errNum |= clSetKernelArg(kernel, 0, sizeof(cl_mem), &filters);
+    //errNum |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &outputBuffer);
+	//errNum |= clSetKernelArg(kernel, 2, sizeof(cl_uint), &FILTER_SIZE);
+	//checkErr(errNum, "clSetKernelArg");
+
+	const size_t globalWorkSize[1] = {1};
+    const size_t localWorkSize[1]  = { 1 };
 
     // Queue the kernel up for execution across the array
     auto start = std::chrono::high_resolution_clock::now();
+    for (int x = 0; x < NUM_KERNELS; x++) {
     errNum = clEnqueueNDRangeKernel(
-		queue, 
-		kernel, 
-		2, 
-		NULL,
-        globalWorkSize, 
-		localWorkSize,
-        0, 
-		NULL, 
-		NULL);
-	checkErr(errNum, "clEnqueueNDRangeKernel");
+            queues[x], 
+            kernels[x], 
+            1, 
+            NULL,
+            globalWorkSize, 
+            localWorkSize,
+            0, 
+            NULL, 
+            NULL);
+        checkErr(errNum, "clEnqueueNDRangeKernel");
+    }
     
 	errNum = clEnqueueReadBuffer(
-		queue, 
+		queues[0], 
 		outputBuffer, 
 		CL_TRUE,
         0, 
@@ -268,7 +286,19 @@ int main(int argc, char** argv)
     std::cout << "Run time for the filter was " << runTime << " nanoseconds" << std::endl << std::endl;
 
 
+
     std::cout << std::endl << "Executed program succesfully." << std::endl;
+
+    printf("INPUT: \n");
+    for (int x = 0; x < BUFFER_SIZE; x++) {
+        printf("%d ", input[x]);
+    }
+    printf("\n\nOUTPUT: \n");
+    for (int x = 0; x < BUFFER_SIZE; x++) {
+        printf("%f ", output[x]);
+    }
+
+    printf("\n\n");
 
 	return 0;
 }

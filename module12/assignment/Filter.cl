@@ -13,14 +13,21 @@
 //    This is a simple kernel performing convolution.
 
 __kernel void filter (
-	const __global  uint * const input,
-	const __global  uint * const filter,
+	__global  uint * filter,
+    const int filterSize,
     __global  float * const output,
-    const int inputWidth)
+    const int outputOffset)
 {
-    const int row = get_global_id(0);
-    const int col = get_global_id(1);
+    float total = 0;
+    for (int i = 0; i < filterSize; i++) {
+        total += filter[i];
+    }
 
-    //printf("(%d, %d) -- %d\n", row, col, input[x][y]);
-    printf("(%d, %d) -- %d\n", row, col, filter[(row * 2)  + col]);
+    float average = total / filterSize;
+
+    for (int i = 0; i < filterSize; i++) {
+         output[(outputOffset * filterSize) + i] = average;
+    }
+
+    printf("Finished processing thread %d\n", outputOffset);
 }
