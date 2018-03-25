@@ -240,17 +240,6 @@ int main(int argc, char** argv)
         kernels[x] = kernel;
     }
 
-
-
-
-
-
-	//errNum |= clSetKernelArg(kernel, 0, sizeof(cl_mem), &filters[1]);
-	//errNum |= clSetKernelArg(kernel, 0, sizeof(cl_mem), &filters);
-    //errNum |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &outputBuffer);
-	//errNum |= clSetKernelArg(kernel, 2, sizeof(cl_uint), &FILTER_SIZE);
-	//checkErr(errNum, "clSetKernelArg");
-
 	const size_t globalWorkSize[1] = {1};
     const size_t localWorkSize[1]  = { 1 };
 
@@ -284,8 +273,6 @@ int main(int argc, char** argv)
     auto stop = std::chrono::high_resolution_clock::now();
     int32_t runTime = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count();
     std::cout << "Run time for the filter was " << runTime << " nanoseconds" << std::endl << std::endl;
-
-
 
     std::cout << std::endl << "Executed program succesfully." << std::endl;
 
