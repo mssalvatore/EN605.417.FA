@@ -3,9 +3,9 @@ T_OPTIONS=-L /usr/local/cuda/lib -lcudart -std=c++11
 T_OUTFILE=roulette
 T_INFILE=roulette.cu
 
-all: thrust
+all: roulette
 
-thrust:
+roulette:
 	$(CC) -o $(T_OUTFILE) $(T_INFILE) $(T_OPTIONS)
 
 
