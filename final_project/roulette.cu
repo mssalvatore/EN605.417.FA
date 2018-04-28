@@ -122,7 +122,7 @@ curandState_t* initializeRandom(int numRuns)
   return states;
 }
 
-void runMartingale(int numRuns, int spinsPerRun, float winProbability, int bettingFactor = 2)
+void playRoulette(int numRuns, int spinsPerRun, float winProbability, BettingStrategy strategy, int bettingFactor = 2)
 {
     // Get the average of a set of random numbers
     auto start = std::chrono::high_resolution_clock::now();
@@ -130,25 +130,14 @@ void runMartingale(int numRuns, int spinsPerRun, float winProbability, int betti
 
     float * spinData;
     cudaMalloc((void**) &spinData, numRuns * spinsPerRun * sizeof(float));
-    martingale<<<1, numRuns>>>(winProbability, states, spinData, spinsPerRun, bettingFactor);
-    cudaDeviceSynchronize();
-
-    cudaFree(states);
-    auto stop = std::chrono::high_resolution_clock::now();
-
-    auto runTime = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-    printf("It took %d us \n", runTime);
-}
-
-void runDalembert(int numRuns, int spinsPerRun, float winProbability)
-{
-    // Get the average of a set of random numbers
-    auto start = std::chrono::high_resolution_clock::now();
-    curandState_t* states = initializeRandom(numRuns);
-
-    float * spinData;
-    cudaMalloc((void**) &spinData, numRuns * spinsPerRun * sizeof(float));
-    dalembert<<<1, numRuns>>>(winProbability, states, spinData, spinsPerRun);
+    if (strategy == MARTINGALE)
+    {
+        martingale<<<1, numRuns>>>(winProbability, states, spinData, spinsPerRun, bettingFactor);
+    }
+    else if (strategy == DALEMBERT)
+    {
+        dalembert<<<1, numRuns>>>(winProbability, states, spinData, spinsPerRun, bettingFactor);
+    }
     cudaDeviceSynchronize();
 
     cudaFree(states);
@@ -162,13 +151,5 @@ void runDalembert(int numRuns, int spinsPerRun, float winProbability)
 int main(int argc, char* argv[])
 {
     ProgramOptions options = parseOptions(argc, argv);
-
-    if (options.bettingStrategy == MARTINGALE)
-    {
-        runMartingale(options.numRuns, options.spinsPerRun, options.winProbability, options.bettingFactor);
-    }
-    else if (options.bettingStrategy == DALEMBERT)
-    {
-        runDalembert(options.numRuns, options.spinsPerRun, options.winProbability);//, options.bettingFactor);
-    }
+    playRoulette(options.numRuns, options.spinsPerRun, options.winProbability, options.bettingStrategy, options.bettingFactor);
 }
