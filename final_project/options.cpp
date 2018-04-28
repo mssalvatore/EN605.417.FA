@@ -1,4 +1,4 @@
-enum BettingStrategy { MARTINGALE, DALEMBERT };
+enum BettingStrategy { MARTINGALE, DALEMBERT, FIBONACCI };
 
 struct ProgramOptions
 {
@@ -76,13 +76,17 @@ ProgramOptions parseOptions(int argc, char* argv[])
     if (argc >= 6)
     {
         {
-            if (strcmp(argv[5], "martingale") == 0) 
+            if (strcmp(argv[5], "martingale") == 0)
             {
                 options.bettingStrategy = MARTINGALE;
             }
-            else if (strcmp(argv[5], "dalembert") == 0) 
+            else if (strcmp(argv[5], "dalembert") == 0)
             {
                 options.bettingStrategy = DALEMBERT;
+            }
+            else if (strcmp(argv[5], "fibonacci") == 0)
+            {
+                options.bettingStrategy = FIBONACCI;
             }
             else {
                 throw InvalidArgumentException(argv[5], "betting strategy");

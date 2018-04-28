@@ -17,6 +17,8 @@
 #define BLOCK_SIZE MAX_THREADS_PER_BLOCK
 #define WARP_SIZE 32
 
+__constant__  static const float PHI = 1.618033;
+
 /* this GPU kernel function is used to initialize the random states */
 __global__ void initRandom(unsigned int seed, curandState_t* states)
 {
@@ -111,6 +113,41 @@ __global__ void dalembert(float winProbability, curandState_t* states, float* sp
     printf("Purse: %d\n", purse);
 }
 
+// http://www.maths.surrey.ac.uk/hosted-sites/R.Knott/Fibonacci/fibFormula.html
+__device__ int calculateFibonacciNumber(int n)
+{
+    return round((pow(PHI, n) - pow(-PHI, -n)) / sqrtf(5));
+}
+
+__global__ void fibonacci(float winProbability, curandState_t* states, float* spinData, int spinsPerRun, int bettingFactor = 2)
+{
+    genRandoms(states, spinData, spinsPerRun);
+
+    int tid = (blockDim.x * blockIdx.x) + threadIdx.x;
+    int row = tid * spinsPerRun;
+    int purse = 0;
+    int betSize = 1;
+    int lossCount = 0;
+    int winLossFactor[] = {1, -1};
+    int totalLosses = 0;
+
+    printf("Win probability: %f\n\n", winProbability);
+    for (int i = 0; i < spinsPerRun; i++)
+    {
+        printf("!!Begin!! TID: %d -- Run: %d -- Purse: %d -- Bet: %d -- Losses: %d -- Spin: %f\n", tid, i, purse, betSize, lossCount, spinData[row+i]);
+        int lostSpin = (spinData[row + i] >= winProbability);
+        purse += winLossFactor[lostSpin] * betSize;
+
+        lossCount = lossCount * lostSpin + lostSpin;
+        totalLosses += (lossCount > 0);
+        betSize = bettingFactor * calculateFibonacciNumber(lossCount + 1);
+        printf("!!END  !! TID: %d -- Run: %d -- Purse: %d -- Bet: %d -- Losses: %d -- Spin: %f\n\n", tid, i, purse, betSize, lossCount, spinData[row+i]);
+    }
+
+    printf("Purse: %d\n", purse);
+    printf("TotalLosses %d\n", totalLosses);
+}
+
 curandState_t* initializeRandom(int numRuns)
 {
   curandState_t* states;
@@ -137,6 +174,10 @@ void playRoulette(int numRuns, int spinsPerRun, float winProbability, BettingStr
     else if (strategy == DALEMBERT)
     {
         dalembert<<<1, numRuns>>>(winProbability, states, spinData, spinsPerRun, bettingFactor);
+    }
+    else if (strategy == FIBONACCI)
+    {
+        fibonacci<<<1, numRuns>>>(winProbability, states, spinData, spinsPerRun, bettingFactor);
     }
     cudaDeviceSynchronize();
 
