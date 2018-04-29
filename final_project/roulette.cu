@@ -19,6 +19,8 @@
 
 __constant__  static const float PHI = 1.618033;
 
+typedef int (*betsize_calculator_function)(int bettingFactor, int lossCount);
+
 /* this GPU kernel function is used to initialize the random states */
 __global__ void initRandom(unsigned int seed, curandState_t* states)
 {
@@ -31,7 +33,6 @@ __global__ void initRandom(unsigned int seed, curandState_t* states)
             &states[tid]);
 }
 
-// Generate numbers randomly
 __device__ void genRandoms(curandState_t* states, float* numbers, int count)
 {
     int tid = (blockDim.x * blockIdx.x) + threadIdx.x;
@@ -52,35 +53,6 @@ __device__ int integerPow(int num, int exponent)
     }
 
     return result;
-}
-
-__global__ void martingale(float winProbability, curandState_t* states, float* spinData, int spinsPerRun, int bettingFactor = 2)
-{
-    genRandoms(states, spinData, spinsPerRun);
-
-    int tid = (blockDim.x * blockIdx.x) + threadIdx.x;
-    int row = tid * spinsPerRun;
-    int purse = 0;
-    int betSize = 1;
-    int lossCount = 0;
-    int winLossFactor[] = {1, -1};
-    int totalLosses = 0;
-
-    printf("Win probability: %f\n\n", winProbability);
-    for (int i = 0; i < spinsPerRun; i++)
-    {
-        printf("!!Begin!! TID: %d -- Run: %d -- Purse: %d -- Bet: %d -- Losses: %d -- Spin: %f\n", tid, i, purse, betSize, lossCount, spinData[row+i]);
-        int lostSpin = (spinData[row + i] >= winProbability);
-        purse += winLossFactor[lostSpin] * betSize;
-
-        lossCount = lossCount * lostSpin + lostSpin;
-        totalLosses += (lossCount > 0);
-        betSize = integerPow(bettingFactor, lossCount);
-        printf("!!END  !! TID: %d -- Run: %d -- Purse: %d -- Bet: %d -- Losses: %d -- Spin: %f\n\n", tid, i, purse, betSize, lossCount, spinData[row+i]);
-    }
-
-    printf("Purse: %d\n", purse);
-    printf("TotalLosses %d\n", totalLosses);
 }
 
 __global__ void dalembert(float winProbability, curandState_t* states, float* spinData, int spinsPerRun, int bettingFactor = 1)
@@ -112,13 +84,7 @@ __global__ void dalembert(float winProbability, curandState_t* states, float* sp
     printf("Purse: %d\n", purse);
 }
 
-// http://www.maths.surrey.ac.uk/hosted-sites/R.Knott/Fibonacci/fibFormula.html
-__device__ int calculateFibonacciNumber(int n)
-{
-    return round((pow(PHI, n) - pow(-PHI, -n)) / sqrtf(5));
-}
-
-__global__ void fibonacci(float winProbability, curandState_t* states, float* spinData, int spinsPerRun, int bettingFactor = 2)
+__device__ void executeBettingStrategy(betsize_calculator_function calcBetSize, float winProbability, curandState_t* states, float* spinData, int spinsPerRun, int bettingFactor = 2)
 {
     genRandoms(states, spinData, spinsPerRun);
 
@@ -139,12 +105,34 @@ __global__ void fibonacci(float winProbability, curandState_t* states, float* sp
 
         lossCount = lossCount * lostSpin + lostSpin;
         totalLosses += (lossCount > 0);
-        betSize = bettingFactor * calculateFibonacciNumber(lossCount + 1);
+        betSize = calcBetSize(bettingFactor, lossCount);
         printf("!!END  !! TID: %d -- Run: %d -- Purse: %d -- Bet: %d -- Losses: %d -- Spin: %f\n\n", tid, i, purse, betSize, lossCount, spinData[row+i]);
     }
 
     printf("Purse: %d\n", purse);
     printf("TotalLosses %d\n", totalLosses);
+}
+
+// http://www.maths.surrey.ac.uk/hosted-sites/R.Knott/Fibonacci/fibFormula.html
+__device__ int calculateFibonacciBetSize(int bettingFactor, int lossCount)
+{
+    int n = lossCount + 1;
+    return bettingFactor * (round((pow(PHI, n) - pow(-PHI, -n)) / sqrtf(5))) ;
+}
+
+__device__ int calculateMartingaleBetSize(int bettingFactor, int lossCount)
+{
+    return integerPow(bettingFactor, lossCount);
+}
+
+__global__ void fibonacci(float winProbability, curandState_t* states, float* spinData, int spinsPerRun, int bettingFactor = 1)
+{
+    executeBettingStrategy(&calculateFibonacciBetSize, winProbability, states, spinData, spinsPerRun, bettingFactor);
+}
+
+__global__ void martingale(float winProbability, curandState_t* states, float* spinData, int spinsPerRun, int bettingFactor = 2)
+{
+    executeBettingStrategy(&calculateMartingaleBetSize, winProbability, states, spinData, spinsPerRun, bettingFactor);
 }
 
 curandState_t* initializeRandom(int numRuns)
