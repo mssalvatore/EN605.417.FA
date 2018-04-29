@@ -90,8 +90,7 @@ __global__ void dalembert(float winProbability, curandState_t* states, float* sp
     int tid = (blockDim.x * blockIdx.x) + threadIdx.x;
     int row = tid * spinsPerRun;
     int purse = 0;
-    int initialBet = 1;
-    int betSize = initialBet;
+    int betSize = bettingFactor;
     int lossCount = 0;
     int winLossFactor[] = {1, -1};
 
@@ -106,7 +105,7 @@ __global__ void dalembert(float winProbability, curandState_t* states, float* sp
         //lossCount = lossCount * lostSpin + lostSpin;
         lossCount = (lossCount + winLossFactor[wonSpin]);
         lossCount *= (lossCount > 0);
-        betSize = initialBet + (initialBet * bettingFactor * lossCount);
+        betSize = bettingFactor + (bettingFactor * lossCount);
         printf("!!END  !! TID: %d -- Run: %d -- Purse: %d -- Bet: %d -- Losses: %d -- Spin: %f\n\n", tid, i, purse, betSize, lossCount, spinData[row+i]);
     }
 
