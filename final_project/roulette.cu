@@ -20,6 +20,7 @@
 __constant__  static const float PHI = 1.618033;
 
 typedef int (*betsize_calculator_function)(int bettingFactor, int lossCount);
+typedef int (*loss_calculator_function)(int currentLossCount, int spinResult, int winLossFactor[]);
 
 /* this GPU kernel function is used to initialize the random states */
 __global__ void initRandom(unsigned int seed, curandState_t* states)
@@ -55,62 +56,50 @@ __device__ int integerPow(int num, int exponent)
     return result;
 }
 
-__global__ void dalembert(float winProbability, curandState_t* states, float* spinData, int spinsPerRun, int bettingFactor = 1)
+__device__ void executeBettingStrategy(loss_calculator_function calcLossCount, betsize_calculator_function calcBetSize, float winProbability, curandState_t* states, float* spinData, int spinsPerRun, int bettingFactor = 2, int startingBet = 1)
 {
     genRandoms(states, spinData, spinsPerRun);
 
     int tid = (blockDim.x * blockIdx.x) + threadIdx.x;
     int row = tid * spinsPerRun;
     int purse = 0;
-    int betSize = bettingFactor;
-    int lossCount = 0;
-    int winLossFactor[] = {1, -1};
-
-    printf("Win probability: %f\n\n", winProbability);
-    for (int i = 0; i < spinsPerRun; i++)
-    {
-        printf("!!Begin!! TID: %d -- Run: %d -- Purse: %d -- Bet: %d -- Losses: %d -- Spin: %f\n", tid, i, purse, betSize, lossCount, spinData[row+i]);
-        int lostSpin = (spinData[row + i] >= winProbability);
-        int wonSpin = !(spinData[row + i] >= winProbability);
-        purse += winLossFactor[lostSpin] * betSize;
-
-        //lossCount = lossCount * lostSpin + lostSpin;
-        lossCount = (lossCount + winLossFactor[wonSpin]);
-        lossCount *= (lossCount > 0);
-        betSize = bettingFactor + (bettingFactor * lossCount);
-        printf("!!END  !! TID: %d -- Run: %d -- Purse: %d -- Bet: %d -- Losses: %d -- Spin: %f\n\n", tid, i, purse, betSize, lossCount, spinData[row+i]);
-    }
-
-    printf("Purse: %d\n", purse);
-}
-
-__device__ void executeBettingStrategy(betsize_calculator_function calcBetSize, float winProbability, curandState_t* states, float* spinData, int spinsPerRun, int bettingFactor = 2)
-{
-    genRandoms(states, spinData, spinsPerRun);
-
-    int tid = (blockDim.x * blockIdx.x) + threadIdx.x;
-    int row = tid * spinsPerRun;
-    int purse = 0;
-    int betSize = 1;
+    int betSize = startingBet;
     int lossCount = 0;
     int winLossFactor[] = {1, -1};
     int totalLosses = 0;
 
     printf("Win probability: %f\n\n", winProbability);
+    printf("bettingFactor : %d\n\n", bettingFactor);
     for (int i = 0; i < spinsPerRun; i++)
     {
         printf("!!Begin!! TID: %d -- Run: %d -- Purse: %d -- Bet: %d -- Losses: %d -- Spin: %f\n", tid, i, purse, betSize, lossCount, spinData[row+i]);
         int lostSpin = (spinData[row + i] >= winProbability);
         purse += winLossFactor[lostSpin] * betSize;
 
-        lossCount = lossCount * lostSpin + lostSpin;
-        totalLosses += (lossCount > 0);
+        lossCount = calcLossCount(lossCount, lostSpin, winLossFactor);
+        totalLosses += lostSpin;
         betSize = calcBetSize(bettingFactor, lossCount);
         printf("!!END  !! TID: %d -- Run: %d -- Purse: %d -- Bet: %d -- Losses: %d -- Spin: %f\n\n", tid, i, purse, betSize, lossCount, spinData[row+i]);
     }
 
     printf("Purse: %d\n", purse);
     printf("TotalLosses %d\n", totalLosses);
+}
+
+__device__ int lossCountResetOnWin(int currentLossCount, int spinResult, int * /*[] winLossFactor */)
+{
+    return currentLossCount * spinResult + spinResult;
+}
+
+__device__ int calculateDalembertLossCount(int currentLossCount, int spinResult, int winLossFactor[])
+{
+        int lossCount = (currentLossCount + winLossFactor[!spinResult]);
+        return lossCount * (lossCount > 0);
+}
+
+__device__ int calculateDalembertBetSize(int bettingFactor, int lossCount)
+{
+        return bettingFactor + (bettingFactor * lossCount);
 }
 
 // http://www.maths.surrey.ac.uk/hosted-sites/R.Knott/Fibonacci/fibFormula.html
@@ -125,14 +114,19 @@ __device__ int calculateMartingaleBetSize(int bettingFactor, int lossCount)
     return integerPow(bettingFactor, lossCount);
 }
 
+__global__ void dalembert(float winProbability, curandState_t* states, float* spinData, int spinsPerRun, int bettingFactor = 1)
+{
+    executeBettingStrategy(&calculateDalembertLossCount, &calculateDalembertBetSize, winProbability, states, spinData, spinsPerRun, bettingFactor);
+}
+
 __global__ void fibonacci(float winProbability, curandState_t* states, float* spinData, int spinsPerRun, int bettingFactor = 1)
 {
-    executeBettingStrategy(&calculateFibonacciBetSize, winProbability, states, spinData, spinsPerRun, bettingFactor);
+    executeBettingStrategy(&lossCountResetOnWin, &calculateFibonacciBetSize, winProbability, states, spinData, spinsPerRun, bettingFactor);
 }
 
 __global__ void martingale(float winProbability, curandState_t* states, float* spinData, int spinsPerRun, int bettingFactor = 2)
 {
-    executeBettingStrategy(&calculateMartingaleBetSize, winProbability, states, spinData, spinsPerRun, bettingFactor);
+    executeBettingStrategy(&lossCountResetOnWin, &calculateMartingaleBetSize, winProbability, states, spinData, spinsPerRun, bettingFactor);
 }
 
 curandState_t* initializeRandom(int numRuns)
