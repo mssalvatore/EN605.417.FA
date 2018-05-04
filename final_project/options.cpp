@@ -1,33 +1,11 @@
-enum BettingStrategy { MARTINGALE, DALEMBERT, FIBONACCI };
-
-struct ProgramOptions
-{
-    public:
-        int numRuns;
-        int spinsPerRun;
-        float winProbability;
-        int bettingFactor;
-        BettingStrategy bettingStrategy;
-
-        ProgramOptions(int inNumRuns = 1, int inSpinsPerRun = 100, float inWinProbability = .4737, int inBettingFactor = 2, BettingStrategy inBettingStrategy = MARTINGALE): numRuns(inNumRuns), spinsPerRun(inSpinsPerRun), winProbability(inWinProbability), bettingFactor(inBettingFactor), bettingStrategy(inBettingStrategy) {}
-};
-
-class InvalidArgumentException: public std::exception
-{
-    public:
-        InvalidArgumentException(char * argument, std::string type): argument(argument), type(type) {}
-
-        virtual const char* what() const throw()
-        {
-            char *buffer = new char[256];
-            snprintf(buffer, 255, "This provided argument is not a valid %s: %s", this->type.c_str(), this->argument);
-            return buffer;
-        }
-
-    protected:
-        char * argument;
-        std::string type;
-};
+#include "options.h"
+#include <sstream>
+#include <cmath>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string>
+#include <string.h>
+#include "InvalidArgumentException.h"
 
 int parseIntArgument(char* argument)
 {
@@ -53,6 +31,8 @@ float parseFloatArgument(char* argument)
 
     return x;
 }
+
+ProgramOptions::ProgramOptions(int inNumRuns, int inSpinsPerRun, float inWinProbability, int inBettingFactor, BettingStrategy inBettingStrategy): numRuns(inNumRuns), spinsPerRun(inSpinsPerRun), winProbability(inWinProbability), bettingFactor(inBettingFactor), bettingStrategy(inBettingStrategy) {}
 
 ProgramOptions parseOptions(int argc, char* argv[])
 {

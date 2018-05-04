@@ -1,17 +1,15 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
-#include <exception>
 #include <iostream>
 #include <stdlib.h>
 #include <stdio.h>
-#include <sstream>
 #include <time.h>
 
 #include <curand.h>
 #include <curand_kernel.h>
 
-#include "options.cpp"
+#include "options.h"
 
 #define MAX_THREADS_PER_BLOCK 1024
 #define BLOCK_SIZE MAX_THREADS_PER_BLOCK
