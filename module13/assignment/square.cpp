@@ -13,7 +13,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <queue>
 #include <stdio.h>
 #include <string.h>
 #include <cstring>
@@ -35,7 +34,16 @@ checkErr(cl_int err, const char * name)
     }
 }
 
-size_t readLineFromFile(int * outValues, std::ifstream * file)
+void printInts(int * input, size_t inputSize) {
+    // Display output in rows
+    for (unsigned elems = 0; elems < inputSize; elems++)
+    {
+     std::cout << " " << input[elems];
+    }
+    std::cout << std::endl;
+}
+
+size_t readLineFromFile(int ** outValues, std::ifstream * file)
 {
     std::string line;
     if (! std::getline(*file, line)) {
@@ -51,8 +59,8 @@ size_t readLineFromFile(int * outValues, std::ifstream * file)
         token = std::strtok(NULL, delim);
     }
 
-    outValues = new int[nums.size()];
-    std::copy(nums.begin(), nums.end(), outValues);
+    *outValues = new int[nums.size()];
+    std::copy(nums.begin(), nums.end(), *outValues);
 
     return nums.size();
     
@@ -111,13 +119,13 @@ void enqueueCommand(int * inputOutput, size_t inputSize, cl_uint numDevices, cl_
             event);
 }
 
-void printInts(int * input, size_t inputSize) {
-    // Display output in rows
-    for (unsigned elems = 0; elems < inputSize; elems++)
-    {
-     std::cout << " " << input[elems];
+
+char * getFileName(int argc, char** argv) {
+    if (argc == 1) {
+        return "test_input/f1.txt";
     }
-    std::cout << std::endl;
+
+    return argv[1];
 }
 
 ///
@@ -273,30 +281,32 @@ int main(int argc, char** argv)
      &errNum);
     checkErr(errNum, "clCreateKernel(square)");
 
-    std::ifstream file("input.txt");
-        if (!file) {
-            std::cout <<"Error opening input file " << "input.txt" << std::endl;
-            exit(EXIT_FAILURE);
-        }
+    char * fileName = getFileName(argc, argv);
+
+    std::ifstream file(fileName);
+    if (!file) {
+        std::cout <<"Error opening input file " << "input.txt" << std::endl;
+        exit(EXIT_FAILURE);
+    }
  
-    //std::queue<cl_event*> events;
-    //while (true) {
-        size_t inputSize = readLineFromFile(inputOutput0, &file);
-        printInts(inputOutput0, inputSize);
+    std::vector<int*> outputs;
+    std::vector<int> sizes;
+    int * inputOutput;
+    size_t inputSize = readLineFromFile(&inputOutput, &file);
+    while (inputSize != 0) {
         cl_event *event = new cl_event;
-        enqueueCommand(inputOutput0, inputSize, numDevices, context0, queue0, kernel0, event);
+        enqueueCommand(inputOutput, inputSize, numDevices, context0, queue0, kernel0, event);
+        outputs.push_back(inputOutput);
+        sizes.push_back(inputSize);
 
-        //errNum = clEnqueueWaitForEvents(queue0, 1, event);
+        inputSize = readLineFromFile(&inputOutput, &file);
+    }
 
-    printInts(inputOutput0, inputSize);
-    //printInts(inputOutput1, NUM_BUFFER_ELEMENTS);
- 
-        inputSize = readLineFromFile(inputOutput0, &file);
-        printInts(inputOutput0, inputSize);
-        event = new cl_event;
-        enqueueCommand(inputOutput0, inputSize, numDevices, context0, queue0, kernel0, event);
-    printInts(inputOutput0, inputSize);
- 
+    for (int i = 0; i < outputs.size(); i++) {
+        printInts(outputs[i], sizes[i]);
+    }
+
+
     std::cout << "Program completed successfully" << std::endl;
 
     return 0;
