@@ -13,7 +13,7 @@ __global__ void initRandom(unsigned int seed, curandState_t* states)
             &states[tid]);
 }
 
-__device__ void genRandoms(curandState_t* states, float* numbers, int count)
+__global__ void genRandoms(curandState_t* states, float* numbers, int count)
 {
     int tid = (blockDim.x * blockIdx.x) + threadIdx.x;
     int row = tid * count;

@@ -39,21 +39,24 @@ void playRoulette(int numBlocks, int numThreads, int spinsPerRun, float winProba
 
     float * spinData;
     cudaMalloc((void**) &spinData, numBlocks * numThreads * spinsPerRun * sizeof(float));
+
+    genRandoms<<<numBlocks, numThreads>>>(states, spinData, spinsPerRun);
     if (strategy == MARTINGALE)
     {
-        martingale<<<numBlocks, numThreads>>>(winProbability, states, spinData, spinsPerRun, bettingFactor);
+        martingale<<<numBlocks, numThreads>>>(winProbability, spinData, spinsPerRun, bettingFactor);
     }
     else if (strategy == DALEMBERT)
     {
-        dalembert<<<numBlocks, numThreads>>>(winProbability, states, spinData, spinsPerRun, bettingFactor);
+        dalembert<<<numBlocks, numThreads>>>(winProbability, spinData, spinsPerRun, bettingFactor);
     }
     else if (strategy == FIBONACCI)
     {
-        fibonacci<<<numBlocks, numThreads>>>(winProbability, states, spinData, spinsPerRun, bettingFactor);
+        fibonacci<<<numBlocks, numThreads>>>(winProbability, spinData, spinsPerRun, bettingFactor);
     }
     cudaDeviceSynchronize();
 
     cudaFree(states);
+    cudaFree(spinData);
     auto stop = std::chrono::high_resolution_clock::now();
 
     auto runTime = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();

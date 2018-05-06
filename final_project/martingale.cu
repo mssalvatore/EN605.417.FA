@@ -6,8 +6,8 @@ __device__ int calculateMartingaleBetSize(int bettingFactor, int lossCount)
     return integerPow(bettingFactor, lossCount);
 }
 
-__global__ void martingale(float winProbability, curandState_t* states, float* spinData, int spinsPerRun, int bettingFactor = 2)
+__global__ void martingale(float winProbability, float* spinData, int spinsPerRun, int bettingFactor = 2)
 {
-    executeBettingStrategy(&lossCountResetOnWin, &calculateMartingaleBetSize, winProbability, states, spinData, spinsPerRun, bettingFactor);
+    executeBettingStrategy(&lossCountResetOnWin, &calculateMartingaleBetSize, winProbability, spinData, spinsPerRun, bettingFactor);
 }
 

@@ -10,8 +10,8 @@ __device__ int calculateFibonacciBetSize(int bettingFactor, int lossCount)
     return bettingFactor * (round((pow(PHI, n) - pow(-PHI, -n)) / sqrtf(5))) ;
 }
 
-__global__ void fibonacci(float winProbability, curandState_t* states, float* spinData, int spinsPerRun, int bettingFactor = 1)
+__global__ void fibonacci(float winProbability, float* spinData, int spinsPerRun, int bettingFactor = 1)
 {
-    executeBettingStrategy(&lossCountResetOnWin, &calculateFibonacciBetSize, winProbability, states, spinData, spinsPerRun, bettingFactor);
+    executeBettingStrategy(&lossCountResetOnWin, &calculateFibonacciBetSize, winProbability, spinData, spinsPerRun, bettingFactor);
 }
 

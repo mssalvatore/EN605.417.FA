@@ -1,10 +1,8 @@
 typedef int (*betsize_calculator_function)(int bettingFactor, int lossCount);
 typedef int (*loss_calculator_function)(int currentLossCount, int spinResult, int winLossFactor[]);
 
-__device__ void executeBettingStrategy(loss_calculator_function calcLossCount, betsize_calculator_function calcBetSize, float winProbability, curandState_t* states, float* spinData, int spinsPerRun, int bettingFactor = 2, int startingBet = 1)
+__device__ void executeBettingStrategy(loss_calculator_function calcLossCount, betsize_calculator_function calcBetSize, float winProbability, float* spinData, int spinsPerRun, int bettingFactor = 2, int startingBet = 1)
 {
-    genRandoms(states, spinData, spinsPerRun);
-
     int tid = (blockDim.x * blockIdx.x) + threadIdx.x;
     int row = tid * spinsPerRun;
     int purse = 0;

@@ -12,8 +12,8 @@ __device__ int calculateDalembertBetSize(int bettingFactor, int lossCount)
         return bettingFactor + (bettingFactor * lossCount);
 }
 
-__global__ void dalembert(float winProbability, curandState_t* states, float* spinData, int spinsPerRun, int bettingFactor = 1)
+__global__ void dalembert(float winProbability, float* spinData, int spinsPerRun, int bettingFactor = 1)
 {
-    executeBettingStrategy(&calculateDalembertLossCount, &calculateDalembertBetSize, winProbability, states, spinData, spinsPerRun, bettingFactor);
+    executeBettingStrategy(&calculateDalembertLossCount, &calculateDalembertBetSize, winProbability, spinData, spinsPerRun, bettingFactor);
 }
 
