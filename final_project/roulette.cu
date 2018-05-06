@@ -31,25 +31,25 @@ curandState_t* initializeRandom(int numRuns)
   return states;
 }
 
-void playRoulette(int numRuns, int spinsPerRun, float winProbability, BettingStrategy strategy, int bettingFactor = 2)
+void playRoulette(int numBlocks, int numThreads, int spinsPerRun, float winProbability, BettingStrategy strategy, int bettingFactor = 2)
 {
     // Get the average of a set of random numbers
     auto start = std::chrono::high_resolution_clock::now();
-    curandState_t* states = initializeRandom(numRuns);
+    curandState_t* states = initializeRandom(numBlocks * numThreads);
 
     float * spinData;
-    cudaMalloc((void**) &spinData, numRuns * spinsPerRun * sizeof(float));
+    cudaMalloc((void**) &spinData, numBlocks * numThreads * spinsPerRun * sizeof(float));
     if (strategy == MARTINGALE)
     {
-        martingale<<<1, numRuns>>>(winProbability, states, spinData, spinsPerRun, bettingFactor);
+        martingale<<<numBlocks, numThreads>>>(winProbability, states, spinData, spinsPerRun, bettingFactor);
     }
     else if (strategy == DALEMBERT)
     {
-        dalembert<<<1, numRuns>>>(winProbability, states, spinData, spinsPerRun, bettingFactor);
+        dalembert<<<numBlocks, numThreads>>>(winProbability, states, spinData, spinsPerRun, bettingFactor);
     }
     else if (strategy == FIBONACCI)
     {
-        fibonacci<<<1, numRuns>>>(winProbability, states, spinData, spinsPerRun, bettingFactor);
+        fibonacci<<<numBlocks, numThreads>>>(winProbability, states, spinData, spinsPerRun, bettingFactor);
     }
     cudaDeviceSynchronize();
 
@@ -64,5 +64,5 @@ void playRoulette(int numRuns, int spinsPerRun, float winProbability, BettingStr
 int main(int argc, char* argv[])
 {
     ProgramOptions options = parseOptions(argc, argv);
-    playRoulette(options.numRuns, options.spinsPerRun, options.winProbability, options.bettingStrategy, options.bettingFactor);
+    playRoulette(options.numBlocks, options.numThreads, options.spinsPerRun, options.winProbability, options.bettingStrategy, options.bettingFactor);
 }

@@ -32,39 +32,43 @@ float parseFloatArgument(char* argument)
     return x;
 }
 
-ProgramOptions::ProgramOptions(int inNumRuns, int inSpinsPerRun, float inWinProbability, int inBettingFactor, BettingStrategy inBettingStrategy): numRuns(inNumRuns), spinsPerRun(inSpinsPerRun), winProbability(inWinProbability), bettingFactor(inBettingFactor), bettingStrategy(inBettingStrategy) {}
+ProgramOptions::ProgramOptions(int inNumBlocks, int inNumThreads, int inSpinsPerRun, float inWinProbability, int inBettingFactor, BettingStrategy inBettingStrategy): numBlocks(inNumBlocks), numThreads(inNumThreads), spinsPerRun(inSpinsPerRun), winProbability(inWinProbability), bettingFactor(inBettingFactor), bettingStrategy(inBettingStrategy) {}
 
 ProgramOptions parseOptions(int argc, char* argv[])
 {
     ProgramOptions options;
     if (argc >= 2)
     {
-        options.numRuns = parseIntArgument(argv[1]);
+        options.numBlocks = parseIntArgument(argv[1]);
     }
     if (argc >= 3)
     {
-        options.spinsPerRun = parseIntArgument(argv[2]);
+        options.numThreads = parseIntArgument(argv[2]);
     }
     if (argc >= 4)
     {
-        options.winProbability = parseFloatArgument(argv[3]);
+        options.spinsPerRun = parseIntArgument(argv[3]);
     }
     if (argc >= 5)
     {
-        options.bettingFactor = parseIntArgument(argv[4]);
+        options.winProbability = parseFloatArgument(argv[4]);
     }
     if (argc >= 6)
     {
+        options.bettingFactor = parseIntArgument(argv[5]);
+    }
+    if (argc >= 7)
+    {
         {
-            if (strcmp(argv[5], "martingale") == 0)
+            if (strcmp(argv[6], "martingale") == 0)
             {
                 options.bettingStrategy = MARTINGALE;
             }
-            else if (strcmp(argv[5], "dalembert") == 0)
+            else if (strcmp(argv[6], "dalembert") == 0)
             {
                 options.bettingStrategy = DALEMBERT;
             }
-            else if (strcmp(argv[5], "fibonacci") == 0)
+            else if (strcmp(argv[6], "fibonacci") == 0)
             {
                 options.bettingStrategy = FIBONACCI;
             }

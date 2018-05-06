@@ -12,23 +12,22 @@ __device__ void executeBettingStrategy(loss_calculator_function calcLossCount, b
     int lossCount = 0;
     int winLossFactor[] = {1, -1};
     int totalLosses = 0;
+    int64_t integral = 0;
 
-    printf("Win probability: %f\n\n", winProbability);
-    printf("bettingFactor : %d\n\n", bettingFactor);
     for (int i = 0; i < spinsPerRun; i++)
     {
-        printf("!!Begin!! TID: %d -- Run: %d -- Purse: %d -- Bet: %d -- Losses: %d -- Spin: %f\n", tid, i, purse, betSize, lossCount, spinData[row+i]);
+        //printf("!!Begin!! TID: %d -- Run: %d -- Purse: %d -- Bet: %d -- Losses: %d -- Spin: %f\n", tid, i, purse, betSize, lossCount, spinData[row+i]);
         int lostSpin = (spinData[row + i] >= winProbability);
         purse += winLossFactor[lostSpin] * betSize;
+        integral += purse;
 
         lossCount = calcLossCount(lossCount, lostSpin, winLossFactor);
         totalLosses += lostSpin;
         betSize = calcBetSize(bettingFactor, lossCount);
-        printf("!!END  !! TID: %d -- Run: %d -- Purse: %d -- Bet: %d -- Losses: %d -- Spin: %f\n\n", tid, i, purse, betSize, lossCount, spinData[row+i]);
+        //printf("!!END  !! TID: %d -- Run: %d -- Purse: %d -- Bet: %d -- Losses: %d -- Spin: %f\n\n", tid, i, purse, betSize, lossCount, spinData[row+i]);
     }
 
-    printf("Purse: %d\n", purse);
-    printf("TotalLosses %d\n", totalLosses);
+    printf("The area under the curve is %d\n", integral);
 }
 
 __device__ int lossCountResetOnWin(int currentLossCount, int spinResult, int * /*[] winLossFactor */)
