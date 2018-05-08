@@ -16,6 +16,7 @@
 #include "dalembert.cu"
 #include "fibonacci.cu"
 #include "martingale.cu"
+#include "analytics.h"
 
 #define MAX_THREADS_PER_BLOCK 1024
 #define BLOCK_SIZE MAX_THREADS_PER_BLOCK
@@ -33,21 +34,39 @@ curandState_t* initializeRandom(int numRuns)
   return states;
 }
 
+template <class T>
+void printArray(T * data, size_t size)
+{
+    for (int i = 0; i < size; i++)
+    {
+        std::cout<<data[i] << " ";
+    }
+    std::cout<<std::endl;
+}
+
 void playRoulette(float * spinData, int numBlocks, int numThreads, int spinsPerRun, float winProbability, BettingStrategy strategy, int bettingFactor = 2)
 {
-    // Get the average of a set of random numbers
+    int * gpuPurse;
+    int * gpuMaxPurse;
+    int * gpuMinPurse;
+    int64_t * gpuIntegral;
+    cudaMalloc((void**)&gpuPurse, numBlocks * numThreads * sizeof(int));
+    cudaMalloc((void**)&gpuMaxPurse, numBlocks * numThreads * sizeof(int));
+    cudaMalloc((void**)&gpuMinPurse, numBlocks * numThreads * sizeof(int));
+    cudaMalloc((void**)&gpuIntegral, numBlocks * numThreads * sizeof(int64_t));
+
     auto start = std::chrono::high_resolution_clock::now();
     if (strategy == MARTINGALE)
     {
-        martingale<<<numBlocks, numThreads>>>(winProbability, spinData, spinsPerRun, bettingFactor);
+        martingale<<<numBlocks, numThreads>>>(gpuPurse, gpuMaxPurse, gpuMinPurse, gpuIntegral, winProbability, spinData, spinsPerRun, bettingFactor);
     }
     else if (strategy == DALEMBERT)
     {
-        dalembert<<<numBlocks, numThreads>>>(winProbability, spinData, spinsPerRun, bettingFactor);
+        dalembert<<<numBlocks, numThreads>>>(gpuPurse, gpuMaxPurse, gpuMinPurse, gpuIntegral, winProbability, spinData, spinsPerRun, bettingFactor);
     }
     else if (strategy == FIBONACCI)
     {
-        fibonacci<<<numBlocks, numThreads>>>(winProbability, spinData, spinsPerRun, bettingFactor);
+        fibonacci<<<numBlocks, numThreads>>>(gpuPurse, gpuMaxPurse, gpuMinPurse, gpuIntegral, winProbability, spinData, spinsPerRun, bettingFactor);
     }
     cudaDeviceSynchronize();
 
@@ -55,6 +74,23 @@ void playRoulette(float * spinData, int numBlocks, int numThreads, int spinsPerR
 
     auto runTime = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
     printf("It took %d us \n", runTime);
+
+    int * purse = (int*) malloc(numBlocks * numThreads * sizeof(int));
+    int * maxPurse = (int*) malloc(numBlocks * numThreads * sizeof(int));
+    int * minPurse = (int*) malloc(numBlocks * numThreads * sizeof(int));
+    int64_t * integral = (int64_t*) malloc(numBlocks * numThreads * sizeof(int64_t));
+
+    cudaMemcpy(purse, gpuPurse, numBlocks * numThreads * sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(maxPurse, gpuMaxPurse, numBlocks * numThreads * sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(minPurse, gpuMinPurse, numBlocks * numThreads * sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(integral, gpuIntegral, numBlocks * numThreads * sizeof(int64_t), cudaMemcpyDeviceToHost);
+
+    cudaFree(gpuPurse);
+    cudaFree(gpuMaxPurse);
+    cudaFree(gpuMinPurse);
+    cudaFree(gpuIntegral);
+
+    runAnalytics(purse, maxPurse, minPurse, integral, numBlocks * numThreads);
 }
 
 float * prepareRandomData(int numBlocks, int numThreads, int spinsPerRun)
@@ -115,7 +151,6 @@ int main(int argc, char* argv[])
     float * spinData;
     if (options.fileName)
     {
-        std::cout<<"HERE!!!\n";
         spinData = prepareRealData(options.fileName);
     }
     else {
