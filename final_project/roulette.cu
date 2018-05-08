@@ -23,25 +23,14 @@
 #define WARP_SIZE 32
 #define NUM_ROULETTE_SLOTS 37
 
-curandState_t* initializeRandom(int numRuns)
+curandState_t* initializeRandom(int numBlocks, int numThreads)
 {
   curandState_t* states;
-  cudaMalloc((void**) &states, numRuns * sizeof(curandState_t));
+  cudaMalloc((void**) &states, numBlocks * numThreads * sizeof(curandState_t));
 
-  //init<<<numRuns / BLOCK_SIZE, BLOCK_SIZE>>>(time(0), states);
-  initRandom<<<1, numRuns>>>(time(0), states);
+  initRandom<<<numBlocks, numThreads>>>(time(0), states);
 
   return states;
-}
-
-template <class T>
-void printArray(T * data, size_t size)
-{
-    for (int i = 0; i < size; i++)
-    {
-        std::cout<<data[i] << " ";
-    }
-    std::cout<<std::endl;
 }
 
 void playRoulette(float * spinData, int numBlocks, int numThreads, int spinsPerRun, float winProbability, BettingStrategy strategy, int bettingFactor = 2)
@@ -95,7 +84,7 @@ void playRoulette(float * spinData, int numBlocks, int numThreads, int spinsPerR
 
 float * prepareRandomData(int numBlocks, int numThreads, int spinsPerRun)
 {
-    curandState_t* states = initializeRandom(numBlocks * numThreads);
+    curandState_t* states = initializeRandom(numBlocks, numThreads);
 
     float * spinData;
     cudaMalloc((void**) &spinData, numBlocks * numThreads * spinsPerRun * sizeof(float));
