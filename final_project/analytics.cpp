@@ -55,19 +55,17 @@ T calculateMin(T * data, size_t size)
  
 void runAnalytics(int * purse, int * maxPurse, int * minPurse, int64_t * integral, size_t size)
 {
-    //printArray(purse, size);
-    //printArray(maxPurse, size);
-    //printArray(minPurse, size);
-    //printArray(integral, size);
-
     std::cout<<"Avg Purse: " << calculateMean(purse, size) << std::endl;
     std::cout<<"Max Purse: " << calculateMax(purse, size) << std::endl;
     std::cout<<"Min Purse: " << calculateMin(purse, size) << std::endl;
+    std::cout<<std::endl;
 
     std::cout<<"Max Max Purse: " << calculateMax(maxPurse, size) <<std::endl;
     std::cout<<"Min Min Purse: " << calculateMin(minPurse, size) <<std::endl;
+    std::cout<<std::endl;
 
     std::cout<<"Avg Integral: " << calculateMean(integral, size) << std::endl;
     std::cout<<"Max Integral: " << calculateMax(integral, size) << std::endl;
     std::cout<<"Min Integral: " << calculateMin(integral, size) << std::endl;
+    std::cout<<std::endl;
 }

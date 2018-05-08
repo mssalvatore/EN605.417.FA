@@ -124,19 +124,10 @@ float * prepareRealData(char * fileName)
     return gpuRealSpins;
 }
 
-// Main function
 int main(int argc, char* argv[])
 {
     ProgramOptions options = parseOptions(argc, argv);
-    /*
-    std::cout<<"numBlocks " << options.numBlocks <<std::endl;
-    std::cout<<"numThreads " << options.numThreads <<std::endl;
-    std::cout<<"spinsPerRun " << options.spinsPerRun <<std::endl;
-    std::cout<<"winProbability " << options.winProbability <<std::endl;
-    std::cout<<"bettingFactor " << options.bettingFactor <<std::endl;
-    std::cout<<"bettingStrategy " << options.bettingStrategy <<std::endl;
-    std::cout<<"fileName " << options.fileName <<std::endl;
-    */
+
     float * spinData;
     if (options.fileName)
     {
