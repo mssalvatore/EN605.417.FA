@@ -2,7 +2,7 @@
 #include <string>
 #include <stdio.h>
 
-InvalidArgumentException::InvalidArgumentException(char * argument, std::string type): argument(argument), type(type) {}
+InvalidArgumentException::InvalidArgumentException(const char * argument, std::string type): argument(argument), type(type) {}
 InvalidArgumentException::~InvalidArgumentException() throw() {}
 
 const char* InvalidArgumentException::what() const throw()

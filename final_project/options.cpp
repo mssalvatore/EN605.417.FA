@@ -6,6 +6,7 @@
 #include <string>
 #include <string.h>
 #include "InvalidArgumentException.h"
+#include <getopt.h>
 
 int parseIntArgument(char* argument)
 {
@@ -36,47 +37,48 @@ ProgramOptions::ProgramOptions(int inNumBlocks, int inNumThreads, int inSpinsPer
 
 ProgramOptions parseOptions(int argc, char* argv[])
 {
+    int opt;
+
     ProgramOptions options;
-    if (argc >= 2)
+    while ((opt = getopt(argc, argv, "f:b:t:n:p:m:s")) != -1)
     {
-        options.numBlocks = parseIntArgument(argv[1]);
-    }
-    if (argc >= 3)
-    {
-        options.numThreads = parseIntArgument(argv[2]);
-    }
-    if (argc >= 4)
-    {
-        options.spinsPerRun = parseIntArgument(argv[3]);
-    }
-    if (argc >= 5)
-    {
-        options.winProbability = parseFloatArgument(argv[4]);
-    }
-    if (argc >= 6)
-    {
-        options.bettingFactor = parseIntArgument(argv[5]);
-    }
-    if (argc >= 7)
-    {
-        {
-            if (strcmp(argv[6], "martingale") == 0)
-            {
-                options.bettingStrategy = MARTINGALE;
-            }
-            else if (strcmp(argv[6], "dalembert") == 0)
-            {
-                options.bettingStrategy = DALEMBERT;
-            }
-            else if (strcmp(argv[6], "fibonacci") == 0)
-            {
-                options.bettingStrategy = FIBONACCI;
-            }
-            else {
-                throw InvalidArgumentException(argv[5], "betting strategy");
-            }
+        switch (opt) {
+            case 'f':
+                options.fileName = optarg;
+                break;
+            case 'b':
+                options.numBlocks = parseIntArgument(optarg);
+                break;
+            case 't':
+        options.numThreads = parseIntArgument(optarg);
+                break;
+            case 'n':
+        options.spinsPerRun = parseIntArgument(optarg);
+                break;
+            case 'p':
+        options.winProbability = parseFloatArgument(optarg);
+                break;
+            case 'm':
+        options.bettingFactor = parseIntArgument(optarg);
+                break;
+            case 's':
+                if (strcmp(optarg, "martingale") == 0)
+                {
+                    options.bettingStrategy = MARTINGALE;
+                }
+                else if (strcmp(optarg, "dalembert") == 0)
+                {
+                    options.bettingStrategy = DALEMBERT;
+                }
+                else if (strcmp(optarg, "fibonacci") == 0)
+                {
+                    options.bettingStrategy = FIBONACCI;
+                }
+                else {
+                    throw InvalidArgumentException(optarg, "betting strategy");
+                }
+                break;
         }
     }
-
     return options;
 }

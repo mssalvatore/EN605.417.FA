@@ -1,5 +1,52 @@
 #include <curand.h>
 #include <curand_kernel.h>
+#include <fstream>
+#include <vector>
+#include <cstring>
+#include <iostream>
+
+#define NUM_ROULETTE_SLOTS 37
+
+__device__ __constant__ float cudaColorTranslation[NUM_ROULETTE_SLOTS];
+float hostColorTranslation[NUM_ROULETTE_SLOTS] = {
+    1,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    1
+};
 
 /* this GPU kernel function is used to initialize the random states */
 __global__ void initRandom(unsigned int seed, curandState_t* states)
@@ -33,5 +80,48 @@ __device__ int integerPow(int num, int exponent)
     }
 
     return result;
+}
+
+__host__ std::vector<int> readLineFromFile(std::ifstream * file)
+{
+    std::vector<int> nums;
+
+    std::string line;
+    if (! std::getline(*file, line)) {
+        std::cout<<"CRAP\n";
+        return nums;
+    }
+
+    char * dup = strdup(line.c_str());
+    char delim[] = " ";
+    char * token = std::strtok(dup, delim);
+    while (token != NULL) {
+        nums.push_back(atoi(token));
+        token = std::strtok(NULL, delim);
+    }
+
+
+    return nums;
+}
+
+__global__ void translateSpinsToColors(float* spinData)
+{
+    int tid = (blockDim.x * blockIdx.x) + threadIdx.x;
+    spinData[tid] = cudaColorTranslation[(int)spinData[tid]];
+}
+
+__host__ void getDimensions(int *numBlocks, int *numThreads, int maxThreadsPerBlock, int dataSize)
+{
+    *numThreads = maxThreadsPerBlock;
+    while (((dataSize % *numThreads) != 0) && (*numThreads > 0)) {
+        (*numThreads)--;
+    }
+
+    if (*numThreads == 0) {
+        *numBlocks = 0;
+        *numThreads = 0;
+    }
+
+    *numBlocks = dataSize / *numThreads;
 }
 

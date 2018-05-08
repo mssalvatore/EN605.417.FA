@@ -9,6 +9,7 @@ struct ProgramOptions
         float winProbability;
         int bettingFactor;
         BettingStrategy bettingStrategy;
+        char* fileName;
 
         ProgramOptions(int inNumBlocks = 1, int inNumRuns = 10, int inSpinsPerRun = 100, float inWinProbability = .4737, int inBettingFactor = 2, BettingStrategy inBettingStrategy = MARTINGALE);
 };

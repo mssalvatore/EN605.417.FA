@@ -4,13 +4,13 @@
 class InvalidArgumentException: public std::exception
 {
     public:
-        InvalidArgumentException(char * argument, std::string type);
+        InvalidArgumentException(const char * argument, std::string type);
         virtual ~InvalidArgumentException() throw();
 
         virtual const char* what() const throw();
 
     protected:
-        char * argument;
+        const char * argument;
         std::string type;
 };
 
