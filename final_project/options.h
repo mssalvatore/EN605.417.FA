@@ -11,7 +11,7 @@ struct ProgramOptions
         BettingStrategy bettingStrategy;
         char* fileName;
 
-        ProgramOptions(int inNumBlocks = 1, int inNumRuns = 10, int inSpinsPerRun = 100, float inWinProbability = .4737, int inBettingFactor = 2, BettingStrategy inBettingStrategy = MARTINGALE);
+        ProgramOptions(int inNumBlocks = 1, int inNumRuns = 10, int inSpinsPerRun = 100, float inWinProbability = .486486, int inBettingFactor = 2, BettingStrategy inBettingStrategy = MARTINGALE);
 };
 
 int parseIntArgument(char* argument);
