@@ -17,3 +17,4 @@ struct ProgramOptions
 int parseIntArgument(char* argument);
 float parseFloatArgument(char* argument);
 ProgramOptions parseOptions(int argc, char* argv[]);
+void showUsage();

@@ -4,7 +4,7 @@ T_OUTFILE=roulette
 T_OBJECT=roulette.o
 T_INFILE=roulette.cu
 
-OBJECTS = options.o InvalidArgumentException.o
+OBJECTS = options.o InvalidArgumentException.o IncompatibleArgumentException.o
 
 all: roulette
 
